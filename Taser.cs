@@ -23,7 +23,7 @@ namespace DudeTaser
             instance = this;
             Logger.Log("#----------------------------------------#", ConsoleColor.Green);
             Logger.Log($"{Name} {Assembly.GetName().Version} has been loaded", ConsoleColor.Green);
-            Logger.Log("Author: Dudewithoutname#3129", ConsoleColor.Green);
+            Logger.Log("Author: Dudewithoutname#3129 | Edited by: JonHosting.com", ConsoleColor.Green);
             Logger.Log("#----------------------------------------#", ConsoleColor.Green);
 
             TasedPlayers = new List<CSteamID>();
@@ -45,41 +45,73 @@ namespace DudeTaser
 
         private void OnPlayerDamage(UnturnedPlayer victim, ref EDeathCause cause, ref ELimb limb, ref UnturnedPlayer attacker, ref Vector3 direction, ref float damage, ref float times, ref bool canDamage)
         {
-            if (cause == EDeathCause.GUN && attacker.Player.equipment.itemID == Configuration.Instance.TaserId  
-                && attacker.Player.equipment.isEquipped && !TasedPlayers.Contains(attacker.CSteamID) && attacker.HasPermission(Configuration.Instance.TaserPermission))
+            if ( attacker != null && cause == EDeathCause.GUN && attacker.Player.equipment.isEquipped && !TasedPlayers.Contains(attacker.CSteamID) && !victim.HasPermission(Configuration.Instance.NoTasePerm))
             {
-                victim.Player.equipment.dequip();
-                victim.Player.movement.sendPluginSpeedMultiplier(0.1f);
-                victim.Player.movement.sendPluginJumpMultiplier(0.1f);
-                victim.Player.stance.stance = EPlayerStance.PRONE;
-                victim.Player.stance.checkStance(EPlayerStance.PRONE);
-                TasedPlayers.Add(victim.CSteamID);
-                StartCoroutine(nameof(RemoveFromTased), victim);
-                StartCoroutine(CheckTased(victim));
-                damage = 0;
-                canDamage = false;
+                ushort iID = attacker.Player.equipment.itemID;
+                float MovementMultiplier = -1;
+                float TasedTime = 0;
+                EPlayerStance Stance = EPlayerStance.CLIMB;
+                EPlayerGesture Gesture = EPlayerGesture.NONE;
+                Tased Gg = instance.Configuration.Instance.TasedL.FindLast(a=>a.ID==iID);
+
+                if (attacker.Player.equipment.itemID == Configuration.Instance.TaserId) {
+                    MovementMultiplier = Configuration.Instance.MovementMultiplier;
+                    TasedTime = Configuration.Instance.TasedTime;
+                    Stance = Configuration.Instance.TasedStance;
+                    Gesture = Configuration.Instance.TasedGesture;
+                }
+                else
+                if (Gg != null) {
+                    MovementMultiplier = Gg.MovementMultiplier;
+                    TasedTime = Gg.TaserTime;
+                    Stance = Gg.Stance;
+                    Gesture = Gg.Gesture;
+                }
+                if (MovementMultiplier != -1)
+                {
+                    victim.Player.equipment.dequip();
+                    victim.Player.movement.sendPluginSpeedMultiplier(MovementMultiplier);
+                    victim.Player.movement.sendPluginJumpMultiplier(MovementMultiplier);
+                    if (Stance != EPlayerStance.CLIMB)
+                    {
+                        victim.Player.stance.stance = Stance;
+                        victim.Player.stance.checkStance(Stance);
+                    }
+                    if (Gesture != EPlayerGesture.NONE && victim.Player.animator.gesture != EPlayerGesture.ARREST_START) victim.Player.animator.sendGesture(Gesture, true);
+                    TasedPlayers.Add(victim.CSteamID);
+                    StartCoroutine(RemoveFromTased(victim, TasedTime));
+                    StartCoroutine(CheckTased(victim, Stance, Gesture));
+                    damage = 0;
+                    canDamage = false;
+                }
                 return;
             }
         }
-        private IEnumerator CheckTased(UnturnedPlayer victim)
+        private IEnumerator CheckTased(UnturnedPlayer victim, EPlayerStance Stance, EPlayerGesture Gesture)
         {
             while (TasedPlayers.Contains(victim.CSteamID))
             {
                 victim.Player.equipment.dequip();
-                victim.Player.stance.stance = EPlayerStance.PRONE;
-                victim.Player.stance.checkStance(EPlayerStance.PRONE);
+                if (Stance != EPlayerStance.CLIMB)
+                {
+                    victim.Player.stance.stance = Stance;
+                    victim.Player.stance.checkStance(Stance);
+                }
+                if(Gesture != EPlayerGesture.NONE && victim.Player.animator.gesture != EPlayerGesture.ARREST_START) victim.Player.animator.sendGesture(Gesture, true);
 
                 yield return new WaitForSeconds(0.3f);
             }
+            yield break;
         }
 
-        private IEnumerator RemoveFromTased(UnturnedPlayer victim)
+        private IEnumerator RemoveFromTased(UnturnedPlayer victim, float TasedTime = 0)
         {
-            yield return new WaitForSeconds(Configuration.Instance.TasedTime);
+            yield return new WaitForSeconds(TasedTime);
 
             victim.Player.movement.sendPluginSpeedMultiplier(1f);
             victim.Player.movement.sendPluginJumpMultiplier(1f);
             TasedPlayers.Remove(victim.CSteamID);
+            yield break;
         }
     }
 }
