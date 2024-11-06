@@ -16,7 +16,8 @@ namespace DudeTaser
     public class Taser : RocketPlugin<TaserConfig>
     {
         public static Taser instance;
-        public static List<CSteamID> TasedPlayers;
+        public static HashSet<CSteamID> TasedPlayers;
+        Dictionary<ushort, Tased> TaseDict;
 
         protected override void Load()
         {
@@ -26,8 +27,12 @@ namespace DudeTaser
             Logger.Log("Author: Dudewithoutname#3129 | Edited by: JonHosting.com", ConsoleColor.Green);
             Logger.Log("#----------------------------------------#", ConsoleColor.Green);
 
-            TasedPlayers = new List<CSteamID>();
-
+            TasedPlayers = new HashSet<CSteamID>();
+            TaseDict = new Dictionary<ushort, Tased>();
+            foreach(Tased TaseConf in Configuration.Instance.TasedL)
+            {
+                TaseDict[TaseConf.ID] = TaseConf;
+            }
 
             UnturnedEvents.OnPlayerDamaged += OnPlayerDamage;
             
@@ -45,14 +50,14 @@ namespace DudeTaser
 
         private void OnPlayerDamage(UnturnedPlayer victim, ref EDeathCause cause, ref ELimb limb, ref UnturnedPlayer attacker, ref Vector3 direction, ref float damage, ref float times, ref bool canDamage)
         {
-            if ( attacker != null && cause == EDeathCause.GUN && attacker.Player.equipment.isEquipped && !TasedPlayers.Contains(attacker.CSteamID) && !victim.HasPermission(Configuration.Instance.NoTasePerm))
+            if ( attacker != null && cause == EDeathCause.GUN && attacker.Player.equipment.IsEquipAnimationFinished && !TasedPlayers.Contains(attacker.CSteamID) && !victim.HasPermission(Configuration.Instance.NoTasePerm))
             {
                 ushort iID = attacker.Player.equipment.itemID;
                 float MovementMultiplier = -1;
                 float TasedTime = 0;
                 EPlayerStance Stance = EPlayerStance.CLIMB;
                 EPlayerGesture Gesture = EPlayerGesture.NONE;
-                Tased Gg = instance.Configuration.Instance.TasedL.FindLast(a=>a.ID==iID);
+                TaseDict.TryGetValue(iID, out Tased Gg);
 
                 if (attacker.Player.equipment.itemID == Configuration.Instance.TaserId) {
                     MovementMultiplier = Configuration.Instance.MovementMultiplier;
